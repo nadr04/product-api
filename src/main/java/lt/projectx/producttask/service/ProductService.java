@@ -1,5 +1,7 @@
 package lt.projectx.producttask.service;
 
+import io.micrometer.common.util.StringUtils;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lt.projectx.producttask.entity.Product;
 import lt.projectx.producttask.repository.ProductRepository;
@@ -9,14 +11,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class ProductService {
     private final ProductRepository productRepository;
 
-    public void addProduct(Product product) {
-        productRepository.saveAndFlush(product);
+    public Product addProduct(Product product) {
+        return productRepository.saveAndFlush(product);
     }
 
     public void addTestProducts() {
@@ -37,6 +40,56 @@ public class ProductService {
     public List<Product> getAllProducts() {
         return productRepository.findAll();
     }
+    public List<Product> findAllByDescription(String description) {
+        return productRepository.findAllByDescriptionContainingIgnoreCase(description);
+    }
+    public Product findProductById(Long id) {
+        return productRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Product with id " + id + " not found"));
+    }
+
+    public void deleteProductById(Long id) {
+        Optional<Product> maybeProductFromDb = productRepository.findById(id);
+        if (maybeProductFromDb.isEmpty()) {
+            throw new EntityNotFoundException("Product with id " + id + " not found");
+        }
+        productRepository.deleteById(id);
+    }
+    public Product putProductById(Long id, Product product) {
+        product.setId(id);
+        return productRepository.saveAndFlush(product);
+    }
+    public Product patchProductById(Long id, Product productFromRequest) {
+        Optional<Product> maybeProductFromDb = productRepository.findById(id);
+        if (maybeProductFromDb.isEmpty()) {
+            throw new EntityNotFoundException("Product with id " + id + " not found");
+        }
+
+        Product productFromDb = maybeProductFromDb.get();
+
+        if (StringUtils.isNotBlank(productFromRequest.getName()) &&
+                !productFromRequest.getName().equals(productFromDb.getName())) {
+            productFromDb.setName(productFromRequest.getName());
+        }
+
+        if (productFromRequest.getQuantity() != null  && 
+                !productFromRequest.getQuantity().equals(productFromDb.getQuantity())) {
+            productFromDb.setQuantity(productFromRequest.getQuantity());
+        }
+
+        if (StringUtils.isNotBlank(productFromRequest.getDescription()) &&
+                !productFromRequest.getDescription().equals(productFromDb.getDescription())) {
+            productFromDb.setDescription(productFromRequest.getDescription());
+        }
+
+        if (productFromRequest.getPrice() != null  &&
+                !productFromRequest.getPrice().equals(productFromDb.getPrice())) {
+            productFromDb.setPrice(productFromRequest.getPrice());
+        }
+
+        return productRepository.saveAndFlush(productFromDb);
+    }
+    
     public Page<Product> getAllProductsPageable(Pageable pageable) {
         return productRepository.findAll(pageable);
     }
